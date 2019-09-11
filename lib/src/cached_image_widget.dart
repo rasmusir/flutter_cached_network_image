@@ -126,6 +126,9 @@ class CachedNetworkImage extends StatefulWidget {
   ///  * [BlendMode], which includes an illustration of the effect of each blend mode.
   final BlendMode colorBlendMode;
 
+  /// Used to handle or supress errors generated from either cache and network calls.
+  final void Function(Object error) handleError;
+
   CachedNetworkImage({
     Key key,
     @required this.imageUrl,
@@ -148,6 +151,7 @@ class CachedNetworkImage extends StatefulWidget {
     this.color,
     this.colorBlendMode,
     this.placeholderFadeInDuration,
+    this.handleError
   })  : assert(imageUrl != null),
         assert(fadeOutDuration != null),
         assert(fadeOutCurve != null),
@@ -260,14 +264,21 @@ class CachedNetworkImageState extends State<CachedNetworkImage>
     return _cacheManager().getFileFromMemory(widget.imageUrl);
   }
 
+  Stream<FileInfo> _getFileStream() {
+    var stream = _cacheManager().getFile(widget.imageUrl, headers: widget.httpHeaders);
+    if (widget.handleError != null) {
+      stream = stream.handleError(widget.handleError);
+    }
+    return stream;
+  }
+
   _animatedWidget() {
     var fromMemory = _getFromMemory();
 
     return StreamBuilder<FileInfo>(
       key: _streamBuilderKey,
       initialData: fromMemory,
-      stream: _cacheManager()
-          .getFile(widget.imageUrl, headers: widget.httpHeaders)
+      stream: _getFileStream()
           .where((f) =>
               f?.originalUrl != fromMemory?.originalUrl ||
               f?.validTill != fromMemory?.validTill),
@@ -330,7 +341,7 @@ class CachedNetworkImageState extends State<CachedNetworkImage>
     );
   }
 
-  _cacheManager() {
+  BaseCacheManager _cacheManager() {
     return widget.cacheManager ?? DefaultCacheManager();
   }
 
